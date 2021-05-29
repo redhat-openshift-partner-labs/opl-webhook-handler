@@ -13,7 +13,6 @@ spec:
       labels:
         app: opl-webhook-handler
     spec:
-      serviceAccount: rhecoeng
       serviceAccountName: rhecoeng
       volumes:
         - name: kubeconfig
@@ -44,4 +43,4 @@ spec:
             - name: kubeconfig
               readOnly: true
               mountPath: /etc/.kube
-          image: quay.io/opdev/opl-webhook-handler@sha256:b52051af6d1cfe5b010b4d50242b30c5d2dbfdeff835c10f20ef909ade3b3aa5
+          image: quay.io/opdev/opl-webhook-handler@sha256:b03f18c2ff041c6a0b08cb6467a92ec87ed272ebd08e943bb36354e539d01e3c

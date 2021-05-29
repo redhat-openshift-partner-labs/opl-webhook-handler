@@ -1,11 +1,5 @@
 package main
 
-// Authenticate with Github via go-github library
-// Get LabRequest (latest open issue with triage/accepted label from opdev/lab-requests)
-// Validate LabRequest
-// Create LabRequestBranch for LabRequest via CreateBranch
-// Create LabRequestFile
-
 import (
 	"flag"
 	. "github.com/rhecoeng/utils"
@@ -60,7 +54,7 @@ func main() {
 			pr := payload.(whgh.PullRequestPayload)
 			// Delete branch of PR that is closed and merged
 			if pr.Action == "closed" && pr.PullRequest.Merged == true {
-				DeleteBranch(&CurrentLabRequestBranch, client, ctx)
+				DeleteBranch(&CurrentLabRequestBranch, client, ctx, *org, *repo)
 				CreateClusterDeployment(&labrequest)
 			}
 

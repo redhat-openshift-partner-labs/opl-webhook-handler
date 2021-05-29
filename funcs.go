@@ -16,8 +16,8 @@ import (
 	"time"
 )
 
-func DeleteBranch(request *LabRequestBranch, client *github.Client, ctx context.Context) {
-	_, err := client.Git.DeleteRef(ctx, "opdev", "lab-requests", "heads/"+request.Lab)
+func DeleteBranch(request *LabRequestBranch, client *github.Client, ctx context.Context, org string, repo string) {
+	_, err := client.Git.DeleteRef(ctx, org, repo, "heads/"+request.Lab)
 	ErrorCheck("Unable to delete branch", err)
 }
 
@@ -102,7 +102,6 @@ func CreateLabPullRequest(labRequest *LabRequest,
 }
 
 func DeleteIssue(issue *whgh.IssuesPayload, client *github.Client, ctx context.Context, org string, repo string) {
-	//targetIssue, _, err := client.Issues.Get(ctx, "opdev", "lab-requests", int(issue.Issue.Number))
 	issueState := &github.IssueRequest{State: github.String("closed")}
 	_, _, err := client.Issues.Edit(ctx, org, repo, int(issue.Issue.Number), issueState)
 	ErrorCheck("Unable to close issue", err)
