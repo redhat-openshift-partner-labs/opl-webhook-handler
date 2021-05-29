@@ -17,11 +17,16 @@ import (
 )
 
 func DeleteBranch(request *LabRequestBranch, client *github.Client, ctx context.Context) {
-	_, err := client.Git.DeleteRef(ctx, "opdev", "lab-requests", "heads/" + request.Lab)
+	_, err := client.Git.DeleteRef(ctx, "opdev", "lab-requests", "heads/"+request.Lab)
 	ErrorCheck("Unable to delete branch", err)
 }
 
-func CreateBranch(labRequest *LabRequest, requestBranch *LabRequestBranch, client *github.Client, ctx context.Context) *github.Reference {
+func CreateBranch(labRequest *LabRequest,
+	requestBranch *LabRequestBranch,
+	client *github.Client,
+	ctx context.Context,
+	org string,
+	repo string) *github.Reference {
 	requestJSON, err := json.Marshal(&labRequest)
 	ErrorCheck("Unable to marshal lab request struct", err)
 
@@ -29,14 +34,21 @@ func CreateBranch(labRequest *LabRequest, requestBranch *LabRequestBranch, clien
 	ErrorCheck("Unable to create json file", err)
 
 	branch := &github.Reference{Ref: github.String("refs/heads/" + labRequest.ID.String()), Object: &github.GitObject{SHA: &requestBranch.Base}}
-	ref, _, err := client.Git.CreateRef(ctx, "opdev", "opl-requests", branch)
+	ref, _, err := client.Git.CreateRef(ctx, org, repo, branch)
 	ErrorCheck("Unable to create the branch", err)
 
 	return ref
 }
 
-func CreateLabPullRequest(labRequest *LabRequest, requestBranch *LabRequestBranch, issue *whgh.IssuesPayload, client *github.Client, ctx context.Context) {
-	ref := CreateBranch(labRequest, requestBranch, client, ctx)
+func CreateLabPullRequest(labRequest *LabRequest,
+	requestBranch *LabRequestBranch,
+	issue *whgh.IssuesPayload,
+	client *github.Client,
+	ctx context.Context,
+	org string,
+	repo string,
+	branch string) {
+	ref := CreateBranch(labRequest, requestBranch, client, ctx, org, repo)
 
 	requestJSON, err := json.Marshal(&labRequest)
 
@@ -48,7 +60,7 @@ func CreateLabPullRequest(labRequest *LabRequest, requestBranch *LabRequestBranc
 		Mode:    github.String("100644"),
 	})
 
-	tree, _, err := client.Git.CreateTree(ctx, "opdev", "opl-requests", requestBranch.Lab, entry)
+	tree, _, err := client.Git.CreateTree(ctx, org, repo, requestBranch.Lab, entry)
 
 	// Add the request file to the new branch
 	date := time.Now()
@@ -57,7 +69,7 @@ func CreateLabPullRequest(labRequest *LabRequest, requestBranch *LabRequestBranc
 		Email: github.String("sd-ecosystem@redhat.com"),
 	}
 
-	parent, _, err := client.Repositories.GetCommit(ctx, "opdev", "opl-requests", requestBranch.Lab)
+	parent, _, err := client.Repositories.GetCommit(ctx, org, repo, requestBranch.Lab)
 	ErrorCheck("Unable to get commit", err)
 	parent.Commit.SHA = parent.SHA
 	commitParent := parent.GetCommit()
@@ -69,30 +81,30 @@ func CreateLabPullRequest(labRequest *LabRequest, requestBranch *LabRequestBranc
 		Parents: []*github.Commit{commitParent},
 	}
 
-	commitData, _, err := client.Git.CreateCommit(ctx, "opdev", "opl-requests", &commit)
+	commitData, _, err := client.Git.CreateCommit(ctx, org, repo, &commit)
 	ErrorCheck("Commit creation failed", err)
 	ref.Object.SHA = commitData.SHA
-	_, _, err = client.Git.UpdateRef(ctx, "opdev", "opl-requests", ref, false)
+	_, _, err = client.Git.UpdateRef(ctx, org, repo, ref, false)
 
 	// Create the pull request for the new lab request
 	requestPR := &github.NewPullRequest{
 		Title:               github.String("Lab Request: " + labRequest.ID.String()),
-		Head:                github.String("opdev:" + labRequest.ID.String()),
-		Base:                github.String("master"),
+		Head:                github.String(org + ":" + labRequest.ID.String()),
+		Base:                github.String(branch),
 		Body:                github.String("associated with issue #" + strconv.Itoa(int(issue.Issue.Number))),
 		MaintainerCanModify: github.Bool(false),
 	}
 
-	_, _, err = client.PullRequests.Create(ctx, "opdev", "opl-requests", requestPR)
+	_, _, err = client.PullRequests.Create(ctx, org, repo, requestPR)
 	if ErrorCheck("Unable to create pull request", err) {
-		DeleteIssue(issue, client, ctx)
+		DeleteIssue(issue, client, ctx, org, repo)
 	}
 }
 
-func DeleteIssue(issue *whgh.IssuesPayload, client *github.Client, ctx context.Context) {
+func DeleteIssue(issue *whgh.IssuesPayload, client *github.Client, ctx context.Context, org string, repo string) {
 	//targetIssue, _, err := client.Issues.Get(ctx, "opdev", "lab-requests", int(issue.Issue.Number))
 	issueState := &github.IssueRequest{State: github.String("closed")}
-	_, _, err := client.Issues.Edit(ctx, "opdev", "opl-requests", int(issue.Issue.Number), issueState)
+	_, _, err := client.Issues.Edit(ctx, org, repo, int(issue.Issue.Number), issueState)
 	ErrorCheck("Unable to close issue", err)
 }
 
@@ -118,11 +130,11 @@ func AddSSHKeysToLabSecret(clientset *kubernetes.Clientset, labRequest *LabReque
 		types.StrategicMergePatchType,
 		[]byte(data),
 		metav1.PatchOptions{})
-	ErrorCheck("Unable to patch secret " + labRequest.ID.String() + ": ", err)
+	ErrorCheck("Unable to patch secret "+labRequest.ID.String()+": ", err)
 }
 
 func AddInstallConfigToLabSecret(clientset *kubernetes.Clientset, labRequest *LabRequest) {
-  installconfig := base64.StdEncoding.EncodeToString(GenerateInstallConfig(labRequest))
+	installconfig := base64.StdEncoding.EncodeToString(GenerateInstallConfig(labRequest))
 
 	data := "{\"data\":{\"install-config.yaml\": \"" + installconfig + "\"}}"
 	_, err := clientset.CoreV1().Secrets("hive").Patch(context.Background(),
@@ -130,7 +142,7 @@ func AddInstallConfigToLabSecret(clientset *kubernetes.Clientset, labRequest *La
 		types.StrategicMergePatchType,
 		[]byte(data),
 		metav1.PatchOptions{})
-	ErrorCheck("Unable to patch secret " + labRequest.ID.String() + ": ", err)
+	ErrorCheck("Unable to patch secret "+labRequest.ID.String()+": ", err)
 }
 
 func AddOpenShiftVersionToLabSecret(clientset *kubernetes.Clientset, labRequest *LabRequest) {

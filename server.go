@@ -7,10 +7,12 @@ package main
 // Create LabRequestFile
 
 import (
+	"flag"
 	. "github.com/rhecoeng/utils"
 	whgh "gopkg.in/go-playground/webhooks.v5/github"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
@@ -19,8 +21,19 @@ const (
 )
 
 func main() {
+	org := flag.String("org", "rhecoeng", "Github Organization")
+	repo := flag.String("repo", "opl-requests", "Github Repository")
+	branch := flag.String("branch", "master", "Github Branch")
+	whsecret := flag.String("whsecret", "", "Github Webhook Secret")
 
-	hook, _ := whgh.New(whgh.Options.Secret("e6eb4431baf7fb92820cb451755e3d97a41b1d6d"))
+	flag.Parse()
+
+	whenvsecret, ok := os.LookupEnv("GITHUB_SECRET")
+	if ok {
+		*whsecret = whenvsecret
+	}
+
+	hook, _ := whgh.New(whgh.Options.Secret(*whsecret))
 	client, ctx := GithubAuthenticate()
 	clientset := K8sAuthenticate()
 
@@ -28,8 +41,8 @@ func main() {
 
 	// Get commit SHA for master and store it in CurrentLabRequestBranch.Base field
 	var CurrentLabRequestBranch LabRequestBranch
-	masterBranch, _, err := client.Repositories.GetBranch(ctx, "opdev", "opl-requests", "master")
-	ErrorCheck("Unable to get the master branch for SHA", err)
+	masterBranch, _, err := client.Repositories.GetBranch(ctx, *org, *repo, *branch)
+	ErrorCheck("Unable to get the "+*branch+" branch for SHA", err)
 	CurrentLabRequestBranch.Base = *masterBranch.GetCommit().SHA
 
 	http.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
@@ -73,7 +86,7 @@ func main() {
 				AddOpenShiftVersionToLabSecret(clientset, &labrequest)
 				GenerateInstallConfig(&labrequest)
 				AddInstallConfigToLabSecret(clientset, &labrequest)
-				CreateLabPullRequest(&labrequest, &CurrentLabRequestBranch, &issue, client, ctx)
+				CreateLabPullRequest(&labrequest, &CurrentLabRequestBranch, &issue, client, ctx, *org, *repo, *branch)
 			} else {
 				log.Printf("%v is an event being watched; action \"%v\" and state \"%v\" do not trigger.\n",
 					r.Header.Get("X-GitHub-Event"),

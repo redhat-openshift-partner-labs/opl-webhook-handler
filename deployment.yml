@@ -1,0 +1,47 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: opl-webhook-handler
+  namespace: hive
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: opl-webhook-handler
+  template:
+    metadata:
+      labels:
+        app: opl-webhook-handler
+    spec:
+      serviceAccount: rhecoeng
+      serviceAccountName: rhecoeng
+      volumes:
+        - name: kubeconfig
+          secret:
+            secretName: kubeconfig
+      containers:
+        - name: opl-webhook-handler
+          command:
+            - opl-webhook-handler
+          env:
+            - name: GITHUB_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: github
+                  key: hmac
+            - name: GITHUB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: github
+                  key: token
+            - name: OPENSHIFT_KUBECONFIG
+              value: /etc/.kube/config
+          ports:
+            - containerPort: 3000
+              protocol: TCP
+          imagePullPolicy: IfNotPresent
+          volumeMounts:
+            - name: kubeconfig
+              readOnly: true
+              mountPath: /etc/.kube
+          image: quay.io/opdev/opl-webhook-handler@sha256:b52051af6d1cfe5b010b4d50242b30c5d2dbfdeff835c10f20ef909ade3b3aa5
