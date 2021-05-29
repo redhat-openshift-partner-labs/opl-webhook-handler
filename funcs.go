@@ -1,70 +1,21 @@
-package libs
+package main
 
 import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"github.com/google/go-github/v33/github"
-	"golang.org/x/oauth2"
+	. "github.com/rhecoeng/utils"
 	whgh "gopkg.in/go-playground/webhooks.v5/github"
 	"io/ioutil"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	. "k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"log"
-	"os"
 	"strconv"
 	"time"
 )
 
-func GithubAuthenticate() (*github.Client, context.Context) {
-	accesstoken := os.Getenv("GITHUB_TOKEN")
-	ctx := context.Background()
-	ts := oauth2.StaticTokenSource(
-		&oauth2.Token{AccessToken: accesstoken},
-	)
-	tc := oauth2.NewClient(ctx, ts)
-	client := github.NewClient(tc)
-	return client, ctx
-}
-
-func K8sAuthenticate() *kubernetes.Clientset {
-	// create k8s client
-	cfg, err := clientcmd.BuildConfigFromFlags("", os.Getenv("OPENSHIFT_KUBECONFIG"))
-	ErrorCheck("The kubeconfig could not be loaded", err)
-	clientset, err := kubernetes.NewForConfig(cfg)
-
-	return clientset
-}
-
-func DefaultClientK8sAuthenticate() (*rest.Config, error) {
-	cfg, err := clientcmd.LoadFromFile(os.Getenv("OPENSHIFT_KUBECONFIG"))
-	ErrorCheck("The kubeconfig could not be loaded", err)
-	client := clientcmd.NewDefaultClientConfig(*cfg, &clientcmd.ConfigOverrides{})
-
-	return client.ClientConfig()
-}
-
-func DynamicClientK8sAuthenticate() (Interface, error) {
-	cfg, err := clientcmd.BuildConfigFromFlags("", os.Getenv("OPENSHIFT_KUBECONFIG"))
-	ErrorCheck("The kubeconfig could not be loaded", err)
-	client, err := NewForConfig(cfg)
-
-	return client, err
-}
-
-func ErrorCheck(message string, err error) (ok bool) {
-	if err != nil {
-		log.Printf("%s: %v", message, err)
-	}
-	return true
-}
-
-// function that removes completed, expired, or deleted lab github branches
 func DeleteBranch(request *LabRequestBranch, client *github.Client, ctx context.Context) {
 	_, err := client.Git.DeleteRef(ctx, "opdev", "lab-requests", "heads/" + request.Lab)
 	ErrorCheck("Unable to delete branch", err)
@@ -191,12 +142,5 @@ func AddOpenShiftVersionToLabSecret(clientset *kubernetes.Clientset, labRequest 
 		types.StrategicMergePatchType,
 		[]byte(data),
 		metav1.PatchOptions{})
-	ErrorCheck("Unable to add OpenShift Version to secret " + labRequest.ID.String() + ": ", err)
-}
-
-func RemoveArtifacts(artifacts []string) {
-	for _, artifact := range artifacts {
-		err := os.Remove(artifact)
-		ErrorCheck("Unable to remove file: %v", err)
-	}
+	ErrorCheck("Unable to add OpenShift Version to secret "+labRequest.ID.String()+": ", err)
 }
