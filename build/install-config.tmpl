@@ -1,0 +1,36 @@
+apiVersion: v1
+baseDomain: {{if .BaseDomain}}{{.BaseDomain}}{{else}}opdev.io{{end}}
+compute:
+- architecture: amd64
+  hyperthreading: Enabled
+  name: worker
+  platform:
+    aws:
+      type: {{.WorkerSize}}
+  replicas: {{if .WorkerReplicas}}{{.WorkerReplicas}}{{else}}3{{end}}
+controlPlane:
+  architecture: amd64
+  hyperthreading: Enabled
+  name: master
+  platform:
+    aws:
+      type: {{.MasterSize}}
+  replicas: {{if .MasterReplicas}}{{.MasterReplicas}}{{else}}3{{end}}
+metadata:
+  name: {{if .ClusterName}}{{.ClusterName}}.opl{{else}}lab.opl{{end}}
+networking:
+  clusterNetwork:
+  - cidr: 10.128.0.0/14
+    hostPrefix: 23
+  machineNetwork:
+  - cidr: 10.0.0.0/16
+  networkType: {{if .NetworkType}}{{.NetworkType}}{{else}}OpenShiftSDN{{end}}
+  serviceNetwork:
+  - {{if .ServiceNetwork}}{{.ServiceNetwork}}{{else}}172.30.0.0/16{{end}}
+platform:
+  {{if .Cloud}}{{.Cloud}}{{else}}aws{{end}}:
+    {{if .RegionDesignation}}{{.RegionDesignation}}{{else}}region{{end}}: {{if .Region}}{{.Region}}{{else}}us-west-2{{end}}
+publish: External
+pullSecret: '{{.PullSecret}}'
+sshKey: |
+  {{.PublicSSHKey}}
