@@ -17,7 +17,7 @@ controlPlane:
       type: {{.MasterSize}}
   replicas: {{if .MasterReplicas}}{{.MasterReplicas}}{{else}}3{{end}}
 metadata:
-  name: {{if .ClusterName}}{{.ClusterName}}.opl{{else}}lab.opl{{end}}
+  name: {{.ClusterName}}
 networking:
   clusterNetwork:
   - cidr: 10.128.0.0/14

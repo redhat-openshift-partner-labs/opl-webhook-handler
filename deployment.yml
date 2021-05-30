@@ -43,4 +43,4 @@ spec:
             - name: kubeconfig
               readOnly: true
               mountPath: /etc/.kube
-          image: quay.io/opdev/opl-webhook-handler@sha256:b03f18c2ff041c6a0b08cb6467a92ec87ed272ebd08e943bb36354e539d01e3c
+          image: quay.io/opdev/opl-webhook-handler@sha256:c4cb3bf0483218dac24fd8d8c0e9fba988d260205db737250cd6ae690b0153f9
