@@ -33,7 +33,11 @@ func CreateBranch(labRequest *LabRequest,
 	err = ioutil.WriteFile("/tmp/"+labRequest.ID.String()+".json", requestJSON, 0644)
 	ErrorCheck("Unable to create json file", err)
 
-	branch := &github.Reference{Ref: github.String("refs/heads/" + labRequest.ID.String()), Object: &github.GitObject{SHA: &requestBranch.Base}}
+	branch := &github.Reference{
+		Ref: github.String("refs/heads/" + labRequest.ID.String()),
+		Object: &github.GitObject{SHA: &requestBranch.Base},
+	}
+
 	ref, _, err := client.Git.CreateRef(ctx, org, repo, branch)
 	ErrorCheck("Unable to create the branch", err)
 
@@ -64,9 +68,10 @@ func CreateLabPullRequest(labRequest *LabRequest,
 
 	// Add the request file to the new branch
 	date := time.Now()
+	// TODO: allow custom author fields (viper)
 	author := &github.CommitAuthor{
-		Date: &date, Name: github.String("Lifecycle Engineering"),
-		Email: github.String("sd-ecosystem@redhat.com"),
+		Date: &date, Name: github.String("OpenShift Partner Labs"),
+		Email: github.String("opl-no-reply@redhat.com"),
 	}
 
 	parent, _, err := client.Repositories.GetCommit(ctx, org, repo, requestBranch.Lab)
@@ -74,6 +79,7 @@ func CreateLabPullRequest(labRequest *LabRequest,
 	parent.Commit.SHA = parent.SHA
 	commitParent := parent.GetCommit()
 
+	// TODO: allow custom commit fields (viper)
 	commit := github.Commit{
 		Author:  author,
 		Message: github.String("Triaged Lab Request: " + labRequest.ID.String()),
@@ -87,6 +93,7 @@ func CreateLabPullRequest(labRequest *LabRequest,
 	_, _, err = client.Git.UpdateRef(ctx, org, repo, ref, false)
 
 	// Create the pull request for the new lab request
+	// TODO: allow custom pull request fields (viper)
 	requestPR := &github.NewPullRequest{
 		Title:               github.String("Lab Request: " + labRequest.ID.String()),
 		Head:                github.String(org + ":" + labRequest.ID.String()),
@@ -115,11 +122,16 @@ func CreateLabSecret(clientset *kubernetes.Clientset, labRequest *LabRequest) {
 		Type: "Opaque",
 	}
 
-	_, err := clientset.CoreV1().Secrets("hive").Create(context.Background(), &labSecret, metav1.CreateOptions{})
+	_, err := clientset.CoreV1().Secrets("hive").Create(
+		context.Background(),
+		&labSecret,
+		metav1.CreateOptions{})
+
 	ErrorCheck("Unable to create secret", err)
 }
 
-func AddSSHKeysToLabSecret(clientset *kubernetes.Clientset, labRequest *LabRequest, publickey []byte, privatekey []byte) {
+func AddSSHKeysToLabSecret(clientset *kubernetes.Clientset,
+	labRequest *LabRequest, publickey []byte, privatekey []byte) {
 	pubkey := base64.StdEncoding.EncodeToString(publickey)
 	prikey := base64.StdEncoding.EncodeToString(privatekey)
 	data := "{\"data\":{\"ssh-publickey\": \"" + pubkey + "\", \"ssh-privatekey\": \"" + prikey + "\"}}"
